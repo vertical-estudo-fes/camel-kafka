@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # MySQL configurado para CDC (Binlog Ativo)
+  mysql-db:
+    image: mysql:8.0
+    ports: ["3306:3306"]
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: orderdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    command: 
+      - --server-id=1 
+      - --log-bin=mysql-bin 
+      - --binlog-format=row
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # MongoDB para o cenário de Leitura (CQRS)
+  mongodb:
+    image: mongo:6.0
+    ports: ["27017:27017"]
+
+  # Debezium (Kafka Connect) para capturar mudanças do MySQL
+  connect:
+    image: quay.io/debezium/connect:2.5
+    ports: ["8083:8083"]
+    depends_on: [kafka, mysql-db]
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+      # Importante: Desativar schemas para facilitar o parse no Camel (JSON puro)
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+  # Sua Aplicação Spring Boot + Camel
+  app-integrada:
+    build: ./app-integrada
+    ports: ["8080:8080"]
+    depends_on: [kafka, mysql-db, mongodb]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/orderdb?allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/analyticsdb
