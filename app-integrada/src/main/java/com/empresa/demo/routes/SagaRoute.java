@@ -5,13 +5,15 @@ import com.empresa.demo.service.OrderService;
 
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 @Component
 public class SagaRoute extends RouteBuilder {
-    
+
+    @Autowired
     private OrderService orderService;
 
     @Override
