@@ -65,7 +65,7 @@ services:
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_PLUGIN_PATH: "/kafka/connect"
     volumes:
-      - ./connect-debezium.json:/kafka/connector-config.json
+      - ./connect-debezium.json:/kafka/connect-debezium.json
       - ./register-connector.sh:/kafka/register-connector.sh
     entrypoint: ["/bin/bash", "-c", "chmod +x /kafka/register-connector.sh && /kafka/register-connector.sh"]
 

@@ -19,7 +19,7 @@ echo "Serviços estabilizados. Registrando o conector SQL Server..."
 
 # 4. Registra o conector usando o arquivo montado pelo volume
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
-  http://localhost:8083/connectors/ -d @/kafka/connector-config.json
+  http://localhost:8083/connectors/ -d @/kafka/connect-debezium.json
 
 echo "Registro finalizado."
 

@@ -1,6 +1,8 @@
 package com.empresa.demo.routes;
 
 import com.empresa.demo.model.OrderEntity;
+import com.empresa.demo.service.OrderService;
+
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.springframework.stereotype.Component;
@@ -9,6 +11,9 @@ import java.util.Map;
 
 @Component
 public class SagaRoute extends RouteBuilder {
+    
+    private OrderService orderService;
+
     @Override
     public void configure() throws Exception {
 
@@ -31,9 +36,11 @@ public class SagaRoute extends RouteBuilder {
                 .choice()
                 .when(simple("${body[price]} > 1000")) // Se for caro, falha!
                 .log("❌ ERRO: Saldo insuficiente!")
+                .marshal().json(JsonLibrary.Jackson) 
                 .to("kafka:pagamento.falhou?brokers=kafka:29092")
                 .otherwise()
                 .log("✅ Pagamento Aprovado!")
+                .marshal().json(JsonLibrary.Jackson) 
                 .to("kafka:pagamento.sucesso?brokers=kafka:29092")
                 .end();
 
@@ -46,8 +53,7 @@ public class SagaRoute extends RouteBuilder {
                 // Atualiza status para CANCELLED no MySQL
                 .process(exchange -> {
                     Map data = exchange.getIn().getBody(Map.class);
-                    OrderEntity order = new OrderEntity();
-                    order.setId(Long.valueOf(data.get("id").toString()));
+                    OrderEntity order = orderService.buscaPedidoPorId(Long.valueOf(data.get("id").toString())); 
                     order.setStatus("CANCELLED"); // Atualização
                     exchange.getIn().setBody(order);
                 })

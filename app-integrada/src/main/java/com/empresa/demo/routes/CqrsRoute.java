@@ -30,6 +30,7 @@ public class CqrsRoute extends RouteBuilder {
                     Map after = (Map) payload.get("after");
 
                     // TRANSFORMACAO (ETL): Calcular algo novo para o relatório
+                    after.put("status", "PROCESSADO_PELO_CAMEL");
                     after.put("data_sincronizacao", System.currentTimeMillis());
                     after.put("origem", "CDC-Pipeline");
 
