@@ -1,22 +1,26 @@
 version: '3.8'
 
-services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-
+services:  
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    depends_on: [zookeeper]
-    ports: ["9092:9092"]
+    container_name: kafka
+    ports:
+      - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
 
   # MySQL configurado para CDC (Binlog Ativo)
   mysql-db:
@@ -39,20 +43,31 @@ services:
     image: mongo:6.0
     ports: ["27017:27017"]
 
-  # Debezium (Kafka Connect) para capturar mudanças do MySQL
   connect:
-    image: quay.io/debezium/connect:2.5
-    ports: ["8083:8083"]
-    depends_on: [kafka, mysql-db]
+    image: debezium/connect:2.4
+    container_name: connect-debezium
+    user: root
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - mysql-db
     environment:
       BOOTSTRAP_SERVERS: kafka:29092
       GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: my_connect_configs
-      OFFSET_STORAGE_TOPIC: my_connect_offsets
-      STATUS_STORAGE_TOPIC: my_connect_statuses
-      # Importante: Desativar schemas para facilitar o parse no Camel (JSON puro)
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: "/kafka/connect"
+    volumes:
+      - ./connect-debezium.json:/kafka/connector-config.json
+      - ./register-connector.sh:/kafka/register-connector.sh
+    entrypoint: ["/bin/bash", "-c", "chmod +x /kafka/register-connector.sh && /kafka/register-connector.sh"]
 
   # Sua Aplicação Spring Boot + Camel
   app-integrada:
@@ -62,3 +77,5 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/orderdb?allowPublicKeyRetrieval=true&useSSL=false
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/analyticsdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
