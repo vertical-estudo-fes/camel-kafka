@@ -25,11 +25,11 @@ public class SagaRoute extends RouteBuilder {
                 .log("1. Recebido pedido: ${body.item}")
                 .to("jpa:com.empresa.demo.model.OrderEntity") // Salva PENDING no MySQL
                 .marshal().json()
-                .to("kafka:pedido.criado?brokers=kafka:29092")
+                .to("kafka:pedido.criado")
                 .log("2. Evento 'pedido.criado' enviado ao Kafka");
 
         // 2. Simulação de Pagamento (Consome Kafka)
-        from("kafka:pedido.criado?brokers=kafka:29092")
+        from("kafka:pedido.criado")
                 .routeId("Saga-Step2-ProcessPayment")
                 .unmarshal().json(JsonLibrary.Jackson, Map.class)
                 .log("3. Processando pagamento para pedido ID: ${body[id]}")
@@ -39,15 +39,15 @@ public class SagaRoute extends RouteBuilder {
                 .when(simple("${body[price]} > 1000")) // Se for caro, falha!
                 .log("❌ ERRO: Saldo insuficiente!")
                 .marshal().json(JsonLibrary.Jackson) 
-                .to("kafka:pagamento.falhou?brokers=kafka:29092")
+                .to("kafka:pagamento.falhou")
                 .otherwise()
                 .log("✅ Pagamento Aprovado!")
                 .marshal().json(JsonLibrary.Jackson) 
-                .to("kafka:pagamento.sucesso?brokers=kafka:29092")
+                .to("kafka:pagamento.sucesso")
                 .end();
 
         // 3. Compensação (Rollback)
-        from("kafka:pagamento.falhou?brokers=kafka:29092")
+        from("kafka:pagamento.falhou")
                 .routeId("Saga-Step3-Compensation")
                 .unmarshal().json(JsonLibrary.Jackson, Map.class)
                 .log("⚠️ Iniciando COMPENSAÇÃO para pedido ID: ${body[id]}")

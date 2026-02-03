@@ -14,7 +14,7 @@ public class CqrsRoute extends RouteBuilder {
     public void configure() throws Exception {
 
         // O Debezium publica no tópico: dbserver1.orderdb.orders
-        from("kafka:dbserver1.orderdb.orders?brokers=kafka:29092")
+        from("kafka:dbserver1.orderdb.orders")
                 .routeId("CQRS-RealTime-Sync")
                 .log("📡 CDC Evento recebido do MySQL!")
 
@@ -47,6 +47,6 @@ public class CqrsRoute extends RouteBuilder {
 class MongoConfig {
     @Bean
     public com.mongodb.client.MongoClient mongoBean() {
-        return com.mongodb.client.MongoClients.create("mongodb://mongodb:27017");
+        return com.mongodb.client.MongoClients.create("mongodb://localhost:27017");
     }
 }
